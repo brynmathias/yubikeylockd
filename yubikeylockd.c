@@ -43,13 +43,7 @@ void DeviceNotification( void *		refCon,
 
         // Lock the keychain too
         system("/usr/bin/security lock-keychain");
-
-        io_registry_entry_t reg = IORegistryEntryFromPath(kIOMasterPortDefault, "IOService:/IOResources/IODisplayWrangler");
-        if (reg) {
-            IORegistryEntrySetCFProperty(reg, CFSTR("IORequestIdle"), kCFBooleanTrue);
-            IOObjectRelease(reg);
-        }
-
+        system("/usr/bin/pmset displaysleepnow");
     }
 }
 
@@ -184,7 +178,7 @@ void SignalHandler(int sigraised)
 //
 int main (int argc, const char *argv[])
 {
-    mach_port_t 		masterPort;
+    mach_port_t 		mainPort;
     CFMutableDictionaryRef 	matchingDict;
     CFRunLoopSourceRef		runLoopSource;
     CFNumberRef			numberRef;
@@ -207,8 +201,8 @@ int main (int argc, const char *argv[])
 
     // first create a master_port for my task
     //
-    kr = IOMasterPort(MACH_PORT_NULL, &masterPort);
-    if (kr || !masterPort)
+    kr = IOMainPort(MACH_PORT_NULL, &mainPort);
+    if (kr || !mainPort)
     {
         printf("ERR: Couldn't create a master IOKit Port(%08x)\n", kr);
         return -1;
@@ -228,7 +222,7 @@ int main (int argc, const char *argv[])
     if (!matchingDict)
     {
         printf("Can't create a USB matching dictionary\n");
-        mach_port_deallocate(mach_task_self(), masterPort);
+        mach_port_deallocate(mach_task_self(), mainPort);
         return -1;
     }
 
@@ -262,7 +256,7 @@ int main (int argc, const char *argv[])
     // Create a notification port and add its run loop event source to our run loop
     // This is how async notifications get set up.
     //
-    gNotifyPort = IONotificationPortCreate(masterPort);
+    gNotifyPort = IONotificationPortCreate(mainPort);
     runLoopSource = IONotificationPortGetRunLoopSource(gNotifyPort);
 
     gRunLoop = CFRunLoopGetCurrent();
@@ -285,8 +279,8 @@ int main (int argc, const char *argv[])
     DeviceAdded(NULL, gAddedIter);
 
     // Now done with the master_port
-    mach_port_deallocate(mach_task_self(), masterPort);
-    masterPort = 0;
+    mach_port_deallocate(mach_task_self(), mainPort);
+    mainPort = 0;
 
     // Start the run loop. Now we'll receive notifications.
     //
